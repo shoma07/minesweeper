@@ -1,0 +1,150 @@
+#!/bin/sh
+exec ruby -S -x $0 "$@"
+#! ruby
+number_of_lines, number_of_columns, probability = 10, 10, 0.1
+cells = Array.new
+number_of_lines.times do |number_of_line|
+  cells[number_of_line] = Array.new
+  number_of_columns.times do |number_of_column|
+    cells[number_of_line][number_of_column] = { opened: false, bomb: false, surrounding_bombs: 0, flag: false, pendding: false }
+  end
+end
+input_line, input_column, input_mode = nil, nil, nil
+bomb_placed = false
+game_status = 0
+def recursively_open(cells: Array.new, number_of_lines: 20, number_of_columns: 20, line_index: 0, column_index: 0)
+  cells[line_index][column_index][:opened] = true
+  if cells[line_index][column_index][:surrounding_bombs] == 0
+    surrounding_cells = Array.new
+    surrounding_cells << { line_index: line_index - 1, column_index: column_index } if line_index > 0
+    surrounding_cells << { line_index: line_index - 1, column_index: column_index - 1 } if line_index > 0 && column_index > 0
+    surrounding_cells << { line_index: line_index - 1, column_index: column_index + 1 } if line_index > 0 && column_index < number_of_columns - 1
+    surrounding_cells << { line_index: line_index, column_index: column_index - 1 } if column_index > 0
+    surrounding_cells << { line_index: line_index, column_index: column_index + 1 } if column_index < number_of_columns - 1
+    surrounding_cells << { line_index: line_index + 1, column_index: column_index } if line_index < number_of_lines - 1
+    surrounding_cells << { line_index: line_index + 1, column_index: column_index - 1 } if line_index < number_of_lines - 1 && column_index > 0
+    surrounding_cells << { line_index: line_index + 1, column_index: column_index + 1 } if line_index < number_of_lines - 1 && column_index < number_of_columns - 1
+    surrounding_cells.each do |surrounding_cell|
+      if !cells[surrounding_cell[:line_index]][surrounding_cell[:column_index]][:bomb] && !cells[surrounding_cell[:line_index]][surrounding_cell[:column_index]][:opened]
+        recursively_open(cells: cells, number_of_lines: number_of_lines, number_of_columns: number_of_columns, **surrounding_cell)
+      end
+    end
+  end
+end
+while game_status < 2
+  if game_status > 0
+    if input_line.nil?
+      print "> 行番号: "
+      input_line = gets.chomp.to_i
+    elsif input_column.nil?
+      print "> 列番号: "
+      input_column = gets.chomp.to_i
+    elsif input_mode.nil?
+      print "> モード(o: 開く, f: フラグ, p: 保留): "
+      input_mode = gets.chomp
+    end
+  else
+    game_status = 1
+  end
+  if !input_line.nil? && !input_column.nil? && !input_mode.nil? && input_line < number_of_lines && input_column < number_of_columns
+    if input_mode == "o"
+      if !cells[input_line][input_column][:flag] && !cells[input_line][input_column][:pendding] && !cells[input_line][input_column][:opened]
+        cells[input_line][input_column][:opened] = true
+        unless bomb_placed
+          ((number_of_columns * number_of_lines) * probability).floor.times do |index|
+            success_bomb_placed = false
+            until success_bomb_placed
+              random = rand(number_of_columns * number_of_lines)
+              random_line_index, random_column_index = random / number_of_lines, random % number_of_columns
+              if !cells[random_line_index][random_column_index][:bomb] && !cells[random_line_index][random_column_index][:opened]
+                cells[random_line_index][random_column_index][:bomb] = true
+                cells[random_line_index - 1][random_column_index][:surrounding_bombs] += 1 if random_line_index > 0 # 上
+                cells[random_line_index - 1][random_column_index - 1][:surrounding_bombs] += 1 if random_line_index > 0 && random_column_index > 0 # 左上
+                cells[random_line_index - 1][random_column_index + 1][:surrounding_bombs] += 1 if random_line_index > 0 && random_column_index < number_of_columns - 1 # 右上
+                cells[random_line_index][random_column_index - 1][:surrounding_bombs] += 1 if random_column_index > 0 # 左
+                cells[random_line_index][random_column_index + 1][:surrounding_bombs] += 1 if random_column_index < number_of_columns - 1 # 右
+                cells[random_line_index + 1][random_column_index][:surrounding_bombs] += 1 if random_line_index < number_of_lines - 1 # 下
+                cells[random_line_index + 1][random_column_index - 1][:surrounding_bombs] += 1 if random_line_index < number_of_lines - 1 && random_column_index > 0 # 左下
+                cells[random_line_index + 1][random_column_index + 1][:surrounding_bombs] += 1 if random_line_index < number_of_lines - 1 && random_column_index < number_of_columns - 1 # 右下
+                success_bomb_placed = true
+              end
+            end
+          end
+          bomb_placed = true
+        end
+        if cells[input_line][input_column][:bomb]
+          number_of_lines.times { |number_of_line| number_of_columns.times { |number_of_column| cells[number_of_line][number_of_column][:opened] = true } }
+          game_status = 2
+        else
+          recursively_open(cells: cells, number_of_lines: number_of_lines, number_of_columns: number_of_columns, line_index: input_line, column_index: input_column)
+        end
+        clear_count = 0
+        number_of_lines.times { |number_of_line| number_of_columns.times { |number_of_column|
+          clear_count += 1 if (cells[number_of_line][number_of_column][:opened] && !cells[number_of_line][number_of_column][:bomb]) || (!cells[number_of_line][number_of_column][:opened] && cells[number_of_line][number_of_column][:bomb])
+        } }
+        if clear_count == number_of_lines * number_of_columns
+          number_of_lines.times { |number_of_line| number_of_columns.times { |number_of_column| cells[number_of_line][number_of_column][:opened] = true } }
+          game_status = 3
+        end
+      end
+    elsif input_mode == "p" && !cells[input_line][input_column][:opened]
+      cells[input_line][input_column][:pendding] = cells[input_line][input_column][:pendding] ? false : true
+      cells[input_line][input_column][:flag] = false
+    elsif input_mode == "f" && !cells[input_line][input_column][:opened]
+      cells[input_line][input_column][:flag] = cells[input_line][input_column][:flag] ? false : true
+      cells[input_line][input_column][:pendding] = false
+    end
+  end
+  # puts table
+  print "\e[H\e[2J    "
+  number_of_columns.times { |number_of_column| print number_of_column < 10 ? " #{number_of_column} " : " #{number_of_column}" }
+  print "\n    "
+  number_of_columns.times { print "---" }
+  print "\n"
+  number_of_lines.times do |number_of_line|
+    print number_of_line < 10 ? " #{number_of_line} |" : "#{number_of_line} |"
+    number_of_columns.times do |number_of_column|
+      if !input_line.nil? && input_line == number_of_line && input_mode.nil?
+        if input_column.nil? || (!input_column.nil? && input_column == number_of_column)
+          print "\e[31m"
+        end
+      end
+      cell = cells[number_of_line][number_of_column]
+      if cell[:opened]
+        if cell[:bomb]
+          print " x "
+        else
+          str = cell[:surrounding_bombs] > 0 ? " #{cell[:surrounding_bombs]} " : "   "
+          if cell[:surrounding_bombs] > 4
+            print "\e[32m#{str}"
+          elsif cell[:surrounding_bombs] > 3
+            print "\e[33m#{str}"
+          elsif cell[:surrounding_bombs] > 2
+            print "\e[34m#{str}"
+          elsif cell[:surrounding_bombs] > 1
+            print "\e[35m#{str}"
+          elsif cell[:surrounding_bombs] > 0
+            print "\e[36m#{str}"
+          else
+            print str
+          end
+        end
+      else
+        if cell[:flag]
+          print "[F]"
+        elsif cell[:pendding]
+          print "[?]"
+        else
+          print "[ ]"
+        end
+      end
+      print "\e[0m"
+    end
+    print "|\n"
+  end
+  print "    "
+  number_of_columns.times { print "---" }
+  print "\n"
+  input_line, input_column, input_mode = nil, nil, nil if !input_line.nil? && !input_column.nil? && !input_mode.nil?
+end
+puts game_status == 3 ? "Game Clear" : "Game Over"
