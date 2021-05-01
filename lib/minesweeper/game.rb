@@ -7,7 +7,7 @@ module Minesweeper
 
     def initialize
       @board = Board.new(10, 10)
-      @commands = Command::LIST.to_h { |k, v| [k, v.new] }
+      @commands = Command::LIST.transform_values(&:new)
     end
 
     def start
