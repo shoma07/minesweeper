@@ -1,5 +1,14 @@
 # Minesweeper
 
+## Getting Started
+
+```sh
+$ git clone https://github.com/shoma07/minesweeper.git
+$ cd minesweeper
+$ bundle install
+$ bundle exec minesweeper
+```
+
 ## Contributing
 
 Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/minesweeper.
